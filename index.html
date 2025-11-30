@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dog Shows — SQL GUI</title>
+
+<!-- Styles tuned to match your mockup: mint background, teal rounded boxes, spacing -->
+<style>
+  :root{
+    --bg: #e6fdf8;          /* mint background */
+    --teal: #5cc7c0;        /* input fill */
+    --teal-dark: #058a86;   /* border / text accent */
+    --card: #ffffff;
+    --btn-grad-1: #c9f3ed;
+    --btn-grad-2: #8fe6db;
+  }
+
+  html,body{height:100%;margin:0;font-family: "Segoe UI", Roboto, Arial, sans-serif;background:var(--bg);}
+  .page{
+    max-width:1100px;margin:18px auto;padding:16px;
+  }
+
+  /* header row */
+  .top-row{display:flex;align-items:center;gap:18px;margin-bottom:18px;}
+  .top-row label{font-weight:700;color:#083f3f;font-size:20px;margin-right:10px;}
+  .browse-wrap{display:flex;align-items:center;gap:10px;}
+
+  /* inputs row */
+  .input-row{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+  .input-row input[type="text"], .input-row input[type="number"]{
+    background:white;border-radius:12px;padding:12px;border:3px solid var(--teal-dark);min-width:160px;box-sizing:border-box;
+    font-size:16px;outline:none;
+  }
+  .input-row input::placeholder{color:#777}
+
+  /* Add button styling */
+  #addNew{
+    background:linear-gradient(var(--btn-grad-1),var(--btn-grad-2));
+    border-radius:10px;border:3px solid var(--teal-dark);padding:10px 18px;font-weight:800;font-size:16px;
+    box-shadow:0 6px 0 rgba(0,0,0,.09);cursor:pointer;
+  }
+  #addNew:active{transform:translateY(2px);box-shadow:none;}
+
+  /* Main content area */
+  .main{display:flex;gap:18px;align-items:flex-start;}
+  .left-col{flex:1;min-width:460px;}
+  .right-col{flex:1;min-width:420px;}
+
+  textarea#sqlEditor{
+    width:100%;min-height:260px;border-radius:12px;padding:16px;border:3px solid var(--teal-dark);
+    box-sizing:border-box;font-family:monospace;font-size:15px;resize:vertical;color:#003;outline:none;
+  }
+
+.display{
+  min-height:360px;
+  max-height:360px; /* forces scrolling when overflowing */
+  border-radius:12px;
+  padding:14px;
+  background:var(--card);
+  border:3px solid var(--teal-dark);
+  box-sizing:border-box;
+  overflow:auto; /* scroll */
+  font-family:inherit;
+  color:#024;
+}
+  .display .placeholder{color:#c3d7d4;font-size:18px;padding:6px;}
+
+  /* action buttons under editor */
+  .action-row{display:flex;gap:18px;margin-top:12px;align-items:center;flex-wrap:wrap;}
+  .action-row button{
+    background:linear-gradient(var(--btn-grad-1),var(--btn-grad-2));
+    border-radius:12px;border:3px solid var(--teal-dark);padding:12px 18px;font-weight:800;
+    box-shadow:0 6px 0 rgba(0,0,0,.09);cursor:pointer;
+  }
+  .action-row button:active{transform:translateY(2px);box-shadow:none;}
+
+  /* presets at bottom */
+  .presets{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-top:22px;}
+  .preset-btn{min-width:180px;padding:12px;border-radius:12px;border:3px solid var(--teal-dark);
+             background:linear-gradient(var(--btn-grad-1),var(--btn-grad-2));font-weight:700;cursor:pointer;
+             box-shadow:0 6px 0 rgba(0,0,0,.08);}
+  .preset-btn:active{transform:translateY(2px);box-shadow:none;}
+
+  /* Table styling for result area */
+  table{border-collapse:collapse;width:100%;}
+  th,td{border:1px solid #d6f0ec;padding:8px;text-align:left;font-size:14px;}
+  th{background:#f0fdfc;color:#084;}
+
+  /* small notes */
+  .small{font-size:13px;color:#085;text-align:left;margin-top:8px}
+  input[type="file"]{display:none}
+</style>
+</head>
+<body>
+  <div class="page" role="application" aria-label="Dog Shows SQL GUI">
+
+    <div class="top-row">
+      <label>Insert your CSV file:</label>
+      <div class="browse-wrap">
+        <button id="browseBtn" aria-controls="csvFile">Browse</button>
+        <input id="csvFile" type="file" accept=".csv,text/csv" />
+      </div>
+    </div>
+
+    <div class="input-row" aria-hidden="false">
+      <input id="inpName" type="text" placeholder="Dog’s name" />
+      <input id="inpBreed" type="text" placeholder="Breed" />
+      <input id="inpAge" type="number" placeholder="Age" min="0" />
+      <input id="inpRibbons" type="number" placeholder="# of Ribbons" min="0" />
+      <input id="inpShows" type="number" placeholder="# of Shows Attended" min="0" />
+      <button id="addNew">Add New Dog</button>
+    </div>
+
+    <div class="main">
+      <div class="left-col">
+        <textarea id="sqlEditor" placeholder="Type SQL queries here"></textarea>
+
+        <div class="action-row">
+          <button id="runSql">Run SQL</button>
+          <button id="clearDisplay">Clear Display</button>
+          <button id="exportCsv">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="right-col">
+        <div class="display" id="resultsDisplay">
+          <div class="placeholder">SQL results displayed here</div>
+        </div>
+        <div class="small" style="margin-top:8px">Tip: Press Ctrl+Enter (or Cmd+Enter) in the SQL box to run the query.</div>
+      </div>
+    </div>
+
+    <div class="presets" style="margin-bottom:30px;">
+    <button class="preset-btn" data-q="all">Show All Dogs</button>
+    <button class="preset-btn" data-q="topRibbons">Top Ribbon Winners</button>
+    <button class="preset-btn" data-q="avgByBreed">Average Ribbons by Breed</button>
+    <button class="preset-btn" data-q="olderThan">Older Than 5</button>
+    <button class="preset-btn" data-q="manyShows">Most Show Appearances</button>
+    <button class="preset-btn" data-q="aggregate">Totals & Averages</button>
+    </div>
+  </div>
+
+<script>
+/*
+  Full functionality:
+  - Loads sql.js (SQLite compiled to WASM) from CDN
+  - Creates an in-memory DB with table "dogs"
+  - Can import CSV into the table (attempts to map common headers)
+  - Add new dog (inserts into DB)
+  - Run arbitrary SQL typed into editor and display results
+  - Six preset queries wired to buttons
+  - Export current dogs table to CSV
+  - Seeds 100 sample dogs on first load (seedSample)
+*/
+
+(async function(){
+  // Load sql.js script
+  const CDN = "https://cdn.jsdelivr.net/npm/sql.js@1.6.2/dist/sql-wasm.js";
+  await loadScript(CDN).catch(e=>{
+    alert("Failed to load sql.js from CDN. Ensure you're online.");
+    console.error(e);
+  });
+
+  // init sql.js (locateFile must point to wasm)
+  const SQL = await initSqlJs({ locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.6.2/dist/${file}` });
+
+  // create DB
+  let db = new SQL.Database();
+
+  // create table
+  function createDogsTable(){
+    db.run(`CREATE TABLE IF NOT EXISTS dogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      breed TEXT,
+      age INTEGER,
+      ribbons INTEGER,
+      shows INTEGER
+    );`);
+  }
+  createDogsTable();
+
+  // DOM refs
+  const csvFile = document.getElementById('csvFile');
+  const browseBtn = document.getElementById('browseBtn');
+  const addBtn = document.getElementById('addNew');
+  const sqlEditor = document.getElementById('sqlEditor');
+  const runSqlBtn = document.getElementById('runSql');
+  const clearDisplayBtn = document.getElementById('clearDisplay');
+  const resultsDisplay = document.getElementById('resultsDisplay');
+  const exportCsvBtn = document.getElementById('exportCsv');
+
+  // wire browse button
+  browseBtn.addEventListener('click', ()=> csvFile.click());
+
+  // tiny CSV parser (handles quotes and commas)
+  function parseCSV(text){
+    const rows = [];
+    const lines = text.split(/\r?\n/);
+    for(const line of lines){
+      if(line.trim()==="") continue;
+      const row = [];
+      let cur = "", inQ = false;
+      for(let i=0;i<line.length;i++){
+        const ch = line[i];
+        if(ch === '"'){
+          if(inQ && line[i+1] === '"'){ cur += '"'; i++; continue; } // escaped
+          inQ = !inQ; continue;
+        }
+        if(ch === ',' && !inQ){
+          row.push(cur.trim()); cur="";
+        } else cur += ch;
+      }
+      row.push(cur.trim());
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  // CSV import
+  csvFile.addEventListener('change', async (ev)=>{
+    const f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    const text = await f.text();
+    const rows = parseCSV(text);
+    if(rows.length === 0){ alert("Empty file or couldn't parse."); csvFile.value=""; return; }
+
+    // check header row
+    const header = rows[0].map(h => h.toString().toLowerCase());
+    const expectedWords = ['name','breed','age','ribbon','show'];
+    let hasHeader = header.some(h => expectedWords.some(w => h.includes(w)));
+
+    let dataRows = rows;
+    if(hasHeader) dataRows = rows.slice(1);
+
+    // mapping: if header present, map columns; else assume order name,breed,age,ribbons,shows
+    let mapping = [];
+    if(hasHeader){
+      mapping = header.map(h=>{
+        const norm = h.replace(/[^a-z0-9]/gi,'');
+        if(norm.includes('name')) return 'name';
+        if(norm.includes('breed')) return 'breed';
+        if(norm.includes('age')) return 'age';
+        if(norm.includes('ribbon')) return 'ribbons';
+        if(norm.includes('show')) return 'shows';
+        return null;
+      });
+    } else {
+      mapping = ['name','breed','age','ribbons','shows'];
+    }
+
+    createDogsTable();
+    const insertStmt = db.prepare("INSERT INTO dogs (name,breed,age,ribbons,shows) VALUES (?,?,?,?,?);");
+    db.run("BEGIN;");
+    let inserted = 0;
+    for(const r of dataRows){
+      if(r.length === 0) continue;
+      // build values
+      const vals = ["","","",0,0];
+      for(let i=0;i<Math.min(r.length,mapping.length);i++){
+        const key = mapping[i];
+        let val = r[i];
+        if(key === 'age' || key === 'ribbons' || key === 'shows'){
+          val = val === "" ? 0 : Number(String(val).replace(/[^\d\-\.]/g,'')) || 0;
+        }
+        switch(key){
+          case 'name': vals[0]=val; break;
+          case 'breed': vals[1]=val; break;
+          case 'age': vals[2]=val; break;
+          case 'ribbons': vals[3]=val; break;
+          case 'shows': vals[4]=val; break;
+        }
+      }
+      insertStmt.run(vals);
+      inserted++;
+    }
+    db.run("COMMIT;");
+    insertStmt.free();
+    displayMessage(`Imported ${inserted} rows from CSV.`);
+    csvFile.value = "";
+  });
+
+  // Add new dog
+  addBtn.addEventListener('click', ()=>{
+    createDogsTable();
+    const name = document.getElementById('inpName').value.trim();
+    const breed = document.getElementById('inpBreed').value.trim();
+    let age = Number(document.getElementById('inpAge').value);
+    let ribbons = Number(document.getElementById('inpRibbons').value);
+    let shows = Number(document.getElementById('inpShows').value);
+
+    if(!name){
+      alert("Please enter the dog's name.");
+      return;
+    }
+    if(!Number.isFinite(age) || age < 0) age = 0;
+    if(!Number.isFinite(ribbons) || ribbons < 0) ribbons = 0;
+    if(!Number.isFinite(shows) || shows < 0) shows = 0;
+
+    const stmt = db.prepare("INSERT INTO dogs (name,breed,age,ribbons,shows) VALUES (?,?,?,?,?);");
+    stmt.run([name, breed, age, ribbons, shows]);
+    stmt.free();
+    displayMessage(`Inserted "${name}" into database. Total rows: ${countRows()}.`);
+
+    // clear inputs
+    document.getElementById('inpName').value = "";
+    document.getElementById('inpBreed').value = "";
+    document.getElementById('inpAge').value = "";
+    document.getElementById('inpRibbons').value = "";
+    document.getElementById('inpShows').value = "";
+  });
+
+  // Run SQL
+  runSqlBtn.addEventListener('click', ()=> {
+    const sql = sqlEditor.value.trim();
+    if(!sql){ alert("Type an SQL query into the editor."); return; }
+    runAndDisplay(sql);
+  });
+
+  // Ctrl/Cmd+Enter runs SQL
+  sqlEditor.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+      runSqlBtn.click();
+      e.preventDefault();
+    }
+  });
+
+  // Clear display
+  clearDisplayBtn.addEventListener('click', ()=> {
+    resultsDisplay.innerHTML = `<div class="placeholder">SQL results displayed here</div>`;
+  });
+
+  // Export CSV (all rows in dogs)
+  exportCsvBtn.addEventListener('click', ()=>{
+    try{
+      const res = db.exec("SELECT name, breed, age, ribbons, shows FROM dogs;");
+      if(!res || res.length === 0){ alert("No rows to export."); return; }
+      const cols = res[0].columns;
+      const values = res[0].values;
+      let csv = cols.join(",") + "\n";
+      for(const row of values){
+        const escaped = row.map(col => {
+          if(col === null || col === undefined) return "";
+          const s = String(col);
+          if(s.includes('"')) return `"${s.replace(/"/g,'""')}"`;
+          if(s.includes(',') || s.includes('\n')) return `"${s}"`;
+          return s;
+        });
+        csv += escaped.join(",") + "\n";
+      }
+      const blob = new Blob([csv],{type:"text/csv"});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'dogs_export.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){
+      alert("Export failed: " + e.message);
+    }
+  });
+
+  // run and display helper
+  function runAndDisplay(sql){
+    try{
+      const results = db.exec(sql);
+      if(!results || results.length === 0){
+        displayMessage("Query executed. (No result set to display)");
+        return;
+      }
+      // show first result set as table
+      const first = results[0];
+      const html = buildTableFromResult(first.columns, first.values);
+      resultsDisplay.innerHTML = html;
+      if(results.length > 1){
+        const note = document.createElement('div');
+        note.style.marginTop = "8px";
+        note.style.fontSize = "12px";
+        note.style.color = "#056";
+        note.textContent = `Note: ${results.length-1} additional result set(s) returned; only the first is shown.`;
+        resultsDisplay.appendChild(note);
+      }
+    }catch(e){
+      displayMessage("SQL Error: " + e.message);
+    }
+  }
+
+  function buildTableFromResult(columns, values){
+    let html = "<table><thead><tr>";
+    for(const c of columns) html += `<th>${escapeHtml(c)}</th>`;
+    html += "</tr></thead><tbody>";
+    for(const r of values){
+      html += "<tr>";
+      for(const v of r) html += `<td>${escapeHtml(v === null ? "" : String(v))}</td>`;
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    return html;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
+  }
+
+  function displayMessage(msg){
+    resultsDisplay.innerHTML = `<div style="padding:8px;color:var(--teal-dark);font-weight:700">${escapeHtml(msg)}</div>`;
+  }
+
+  function countRows(){
+    try{
+      const res = db.exec("SELECT COUNT(*) as c FROM dogs;");
+      if(res && res[0] && res[0].values && res[0].values[0]) return res[0].values[0][0];
+    }catch(e){}
+    return 0;
+  }
+
+  // presets mapping (update labels if you want specific descriptions)
+  const presets = {
+    all: "SELECT id, name, breed, age, ribbons, shows FROM dogs ORDER BY name COLLATE NOCASE;",
+    topRibbons: "SELECT name, breed, ribbons FROM dogs ORDER BY ribbons DESC, name LIMIT 10;",
+    avgByBreed: "SELECT breed, ROUND(AVG(ribbons),2) AS avg_ribbons, COUNT(*) AS count FROM dogs GROUP BY breed ORDER BY avg_ribbons DESC;",
+    olderThan: "SELECT name, age, breed FROM dogs WHERE age > 5 ORDER BY age DESC;",
+    manyShows: "SELECT name, shows, breed FROM dogs WHERE shows > 5 ORDER BY shows DESC;",
+    aggregate: "SELECT COUNT(*) AS total_dogs, SUM(ribbons) AS total_ribbons, ROUND(AVG(ribbons),2) AS avg_ribbons, SUM(shows) AS total_shows FROM dogs;"
+  };
+
+  // wire preset buttons
+  document.querySelectorAll('.preset-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      const key = btn.getAttribute('data-q');
+      const sql = presets[key] || presets['all'];
+      sqlEditor.value = sql;
+      runAndDisplay(sql);
+    });
+  });
+
+  // small helper to expose DB for debugging
+  window._db = db;
+
+  // seed 100 sample dogs (only if table empty)
+  function seedSample(){
+    const c = countRows();
+    if(c > 0) return;
+    createDogsTable();
+    const sample = [
+      ["Marble","Beagle",4,3,6],
+      ["Cassie","Border Collie",6,9,12],
+      ["Rex","German Shepherd",7,12,20],
+      ["Puddles","Poodle",2,1,1],
+      ["Luna","Labrador",5,4,8],
+      ["Ziggy","Mixed",8,7,10],
+      ["Max","Labrador",3,2,7],
+      ["Bella","Husky",5,4,10],
+      ["Charlie","Beagle",2,1,6],
+      ["Luna2","Pug",4,3,8],
+      ["Cooper","Golden Retriever",6,4,12],
+      ["Daisy","Cocker Spaniel",3,2,5],
+      ["Milo","Shih Tzu",1,1,4],
+      ["Lucy","Boxer",7,5,10],
+      ["Buddy","Collie",4,3,9],
+      ["Sadie","Border Terrier",5,2,6],
+      ["Rocky","Rottweiler",6,3,8],
+      ["Molly","Pointer",2,1,5],
+      ["Duke","Doberman",7,4,12],
+      ["Bailey","Mixed",3,2,7],
+      ["Teddy","Maltese",1,1,4],
+      ["Maggie","Weimaraner",8,6,9],
+      ["Leo","Chihuahua",2,1,5],
+      ["Chloe","Havanese",4,3,7],
+      ["Bear","Newfoundland",6,5,8],
+      ["Rosie","Beagle",3,2,6],
+      ["Zeus","German Shepherd",6,4,10],
+      ["Ruby","Labrador",5,3,8],
+      ["Finn","Sheltie",2,1,5],
+      ["Lily","Whippet",4,2,6],
+      ["Bentley","Corgi",3,1,5],
+      ["Penny","Mutt",7,4,7],
+      ["Oliver","Poodle",1,1,4],
+      ["Stella","Husky",5,3,8],
+      ["Jackson","Great Dane",6,5,9],
+      ["Zoey","Papillon",2,1,4],
+      ["Loki","Shiba Inu",4,2,6],
+      ["Nala","Mastiff",7,5,8],
+      ["Toby","Terrier",3,1,5],
+      ["Ginger","Kelpie",5,3,7],
+      ["Jax","Ridgeback",4,2,6],
+      ["Ellie","Lab Mix",2,1,4],
+      ["Ace","Pitbull",6,4,9],
+      ["Piper","Samoyed",5,3,8],
+      ["Scout","Coonhound",3,2,7],
+      ["Gracie","Beagle",4,3,6],
+      ["Diesel","Doberman",7,4,10],
+      ["Roxy","Boxer",5,3,7],
+      ["Bruno","Bulldog",6,4,8],
+      ["Phoebe","Corgi",1,1,4],
+      ["Marley","Golden Retriever",5,3,9],
+      ["Honey","Pom Mix",2,1,5],
+      ["Beau","Vizsla",4,3,7],
+      ["Willow","Shepherd Mix",3,2,6],
+      ["Samson","Great Pyrenees",7,5,9],
+      ["Pepper","Spaniel",4,2,6],
+      ["Winston","Bichon",1,1,4],
+      ["Cookie","Shihtzu Mix",3,1,5],
+      ["Rudy","Greyhound",6,4,9],
+      ["Maple","Terrier Mix",2,1,4],
+      ["Chester","Cattle Dog",5,3,7],
+      ["Poppy","Beagle",1,1,4],
+      ["Apollo","Husky",4,3,8],
+      ["Angel","Maltese",2,1,4],
+      ["Murphy","Lab Mix",6,4,9],
+      ["Mocha","Poodle Mix",3,2,6],
+      ["Titan","Rottweiler",7,5,10],
+      ["Cleo","Chihuahua",1,1,4],
+      ["Shadow","Shepherd",5,3,8],
+      ["Princess","Mutt",2,1,5],
+      ["Rexx","Doberman",6,4,9],
+      ["Nova","Husky Mix",4,2,6],
+      ["Gunner","Shepherd",5,3,7],
+      ["Kiara","Lab Mix",3,1,5],
+      ["Cash","Pitbull",7,4,9],
+      ["Bonnie","Spaniel Mix",2,1,4],
+      ["Hunter","Collie",5,3,8],
+      ["Mia","Pom",1,1,4],
+      ["Cody","Retriever Mix",6,4,8],
+      ["Olive","Dachshund",2,1,5],
+      ["Benny","Pointer",4,3,7],
+      ["Skye","Husky",3,2,6],
+      ["Otis","Bulldog Mix",5,3,7],
+      ["Hazel","Beagle Mix",2,1,5],
+      ["Remy","Lab",4,3,8],
+      ["Storm","Collie",6,4,9],
+      ["Maverick","Shepherd Mix",5,3,7],
+      ["Millie","Spaniel",1,1,4],
+      ["Rocco","Pit Mix",6,4,9],
+      ["Zozo","Shih Tzu",2,1,4],
+      ["Sherman","Great Dane",7,5,8],
+      ["Trixie","Yorkie",1,1,4],
+      ["Copper","Coonhound",4,2,6],
+      ["Ariel","Collie",3,1,5],
+      ["Enzo","Italian Greyhound",2,1,5],
+      ["Paisley","Beagle",4,2,6],
+      ["Hank","Lab",5,3,8],
+      ["Pumpkin","Corgi Mix",1,1,4],
+      ["Louie","Terrier Mix",3,2,6],
+      ["Blue","Husky Mix",4,3,7],
+      ["Chance","Retriever",6,4,9],
+      ["Snowball","Maltese Mix",1,1,4],
+      ["River","Setter",5,3,7],
+      ["Stormy","Shepherd Mix",4,2,6],
+      ["Bolt","Dalmatian",3,2,7],
+      ["Freya","Ridgeback",6,4,8]
+    ];
+
+    const stmt = db.prepare("INSERT INTO dogs (name,breed,age,ribbons,shows) VALUES (?,?,?,?,?);");
+    db.run("BEGIN;");
+    for(const r of sample) stmt.run(r);
+    db.run("COMMIT;");
+    stmt.free();
+    displayMessage(`Seeded ${sample.length} sample dogs. Total rows: ${countRows()}.`);
+    // show initial table
+    runAndDisplay(presets['all']);
+  }
+
+  // seed on first run
+  seedSample();
+
+  // helper to load external script
+  function loadScript(src){
+    return new Promise((resolve,reject)=>{
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = (e) => reject(e);
+      document.head.appendChild(s);
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
